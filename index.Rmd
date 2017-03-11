@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## 1. Executvie Summary / Synopsis ##
 There are many modern devices emerging to measure different forms of human activity.  Typically enthusiasts want to measure how much activity they have done.  The challenge here is to measure how well an activity has been done.  The subject is weight lifting barbells.  By following an analytical approach to model building taught in the John's Hopkins University Practical Machine Language course, a model will in the end be selected that is 99.7% accurate and correctly predicted 20 use case outcomes.
 
-Note: I have left the run more verbose than report style so that peers can see the Analytics Pipeline / Reproducible Research method I have followed for this Practical Machine Learning Final Project.  
+Note: I have left the run more verbose than report style so that peers can see the Analytics Pipeline / Reproducible Research method I have followed for this Practical Machine Learning Final Project.  I have done my best to clearly outline where I answer the final project requirements.  
 
 ```{r libraries, messages=FALSE}
 # Load libraries
@@ -168,7 +168,7 @@ dotplot(results)
 
 ```{r best_model, messages=FALSE, cache=TRUE}
 # Summarize Best Model
-fit.rf$finalModel
+summary(fit.rf$finalModel)
 predictions <- predict(fit.rf, training)
 tcm <- confusionMatrix(predictions, training$classe)
 tcm
