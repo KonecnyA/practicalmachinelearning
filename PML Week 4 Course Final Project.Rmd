@@ -1,0 +1,250 @@
+---
+title: "Human Activity Recognition - Predicting How Well A Barbell Is Lifted"
+author: "Andrew F Konecny"
+date: "March 11, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Executvie Summary / Synopsis ##
+There are many modern devices emerging to measure different forms of human activity.  Typically enthusiasts want to measure how much activity they have done.  The challenge here is to measure how well an activity has been done.  The subject is weight lifting barbells.  By following an analytical approach to model building taught in the John's Hopkins University Practical Machine Language course, a model will in the end be selected that is 99.7% accurate and correctly predicted 20 use case outcomes.
+
+Note: I have left the run more verbose than report style so that peers can see the Analytics Pipeline / Reproducible Research method I have followed for this Practical Machine Learning Final Project.  
+
+```{r libraries, messages=FALSE}
+# Load libraries
+library(dplyr)
+library(caret)
+library(rpart)
+library(e1071)
+library(parallel)
+library(doParallel)
+```
+
+## 2. Data Processing ###
+```{r load_data, messages=FALSE, cache=TRUE}
+# Load har data set
+harURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+# When importing data, empty values are also NA
+har = read.csv(harURL, na.string=c("NA","NaN","#DIV/0!",""), header=TRUE)
+dim(har) # Track rows and columns
+# I have turned this off - takes up alot of realestate
+# This report showed the the count of missing data by variable
+#har %>% summarise_each(funs(sum(is.na(.))))
+
+# load quiz data set
+quizURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+quiz = read.csv(quizURL, na.string=c("NA","NaN","#DIV/0!",""), header=TRUE)
+dim(quiz) # Track rows and columns
+```
+
+The first step in model building is to correctly load the data.  Based on the references provided I appear to have the correct number of rows (observations) and columns (variables) for each loaded data set.  
+
+```{r clean_data, messages=FALSE, cache=TRUE}
+# The first 7 variables do not look like useful predictors
+har <- har[,-c(1:7)]
+dim(har) # Track rows and columns
+
+# Early exploration of data shows a number of columns are almost completely NA. Keep columns that don't have missing data
+har <- har[, sapply(har, Negate(anyNA)), drop = FALSE]
+dim(har) # Track rows and columns
+```
+
+The next step in model building is to assess the variables to identify possible predictors. In earlier iterations of this script I did more data exploration to better understand the variables.  X, User_name, timestamps and windows did not appear to be useful for prediction.  I then assessed the quality of each remaining variable (i.e. frequency of valid responses for each variable).  There were a series of variables with at least 98% no observations so I decided to drop them all as potential predictors.  In this case there did not appear to be outliers to deal with and it did not make sense to impute missing data.
+
+```{r split_data, messages=FALSE, cache=TRUE}
+# Create training and testing data sets
+# Splits seem to vary 70 / 30, 75 / 25, 80 / 20
+inTrain = createDataPartition(har$classe, p = 0.70)[[1]]
+training = har[inTrain,]
+testing = har[-inTrain,]
+
+dim(training) # Track rows and columns
+dim(testing) # Track rows and columns
+```
+
+The first assumption I am making is the data entitled training is actually the human activity recognition (HAR) data set. This means to build and validate a model I will create training (70%) and testing (30%) data sets from it.  The second assumption I am making is the data entitiled testing is actually 20 observations where the predcitions will be evaluated to compute a quiz score.  I am not comfortable that a data set with 20 observations is useful to test / validate the final model I choose.  
+
+## 3. Results ##
+### 3.1 Build Models ###
+
+How you built your model:  
+1. Load the data correctly.  
+1. Assess data to identify possible predictors.  
+1. Assess the quality of remaining varaibles.  
+1. Create training and testing data sets for model building.  
+1. Set seeds for reproducibility.  
+1. Build several different types of models.  
+1. Enable parallel processing to speed up model runs.  
+1. Because model runs can take a long time, save model results so don't have to re-run as iteratively improve script and model building.  
+1. Use caret to more easily manage and run many different models.  
+1. 10 k-fold and 10 repeats for repeated cross-validation in training.  
+1. Compare the model results based on Accuracy and select the "best" model.  
+
+```{r build_models, messages=FALSE, cache=TRUE}
+# Set working directory for saving or loading model files
+setwd("C:/Users/konecnya/coursera/pml/models")
+
+# Configure parallel processing
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+# Configure trainControl object
+control <- trainControl(method = "repeatedcv", number = 10, repeats = 10, allowParallel = TRUE)
+metric <- "Accuracy"
+
+# Develop training models OFF
+# a) linear algorithms
+# lda
+#set.seed(666)
+#fit.lda <- train(classe ~ ., data = training, method = "lda", metric = metric, trControl = control, importance=TRUE)
+#save(fit.lda, file="lda.Rdata")
+# b) nonlinear algorithms
+# CART
+#set.seed(666)
+#fit.cart <- train(classe ~ ., data = training, method = "rpart", metric = metric, trControl = control)
+#save(fit.cart, file="cart.Rdata")
+# kNN
+#set.seed(666)
+#fit.knn <- train(classe ~ ., data = training, method = "knn", metric = metric, trControl = control)
+#save(fit.knn, file="knn.Rdata")
+# c) advanced algorithms
+# SVM - On my platform aproximately 5 hours
+#set.seed(666)
+#fit.svm <- train(classe ~ ., data = training, method = "svmRadial", metric = metric, trControl = control, importance=TRUE)
+#save(fit.svm, file="svm.Rdata")
+# Random Forest - On my platform approximately 17 hours
+#set.seed(666)
+#fit.rf <- train(classe ~ ., data = training, method = "rf", metric = metric, trControl = control, importance=TRUE)
+#save(fit.rf, file="rf.Rdata")
+
+# De-register parallel processing cluster
+stopCluster(cluster)
+registerDoSEQ()
+```
+
+```{r load_models}
+# Set working directory for saving or loading model files
+setwd("C:/Users/konecnya/coursera/pml/models")
+
+# Load previous model results ON
+load(file = "lda.RData")
+fit.lda
+load(file = "cart.RData")
+fit.cart
+load(file = "knn.RData")
+fit.knn
+load(file = "svm.RData")
+fit.svm
+load(file = "rf.RData")
+fit.rf
+```
+
+The "Analytics Pipleline" and "Reproducible Research"" principles taught in the John's Hopkins University Data Science Certification has demonstrated that it is an iterative process.  Model building is computationally intensive.  Rather than re-build models each time this analytical script is run for improvement, I decided to save models once satisfied with their best results.
+
+### 3. Accuracy ###
+Why you made the choices you did.  
+
+The first choice was to break the training data set into a training and testing data set.  The second choice was to craft and compare a number of different models using caret.  The third choice was to use tuning parameters for k-fold / cv to leverage cross validation in caret.  The fourth choice was to compare the accuracy of the different models, a summary table and plot.  The final choice was to choose the "best" model which turned out to be crafted by leveraging Random Forest with an accuracy of 99.7%.  This was confirmed by correctly predicting all 20 quiz test cases.  
+
+How you used cross validation.  
+I used k-fold / cv (repeatedcv) within caret.  By doing 10 repeats of 10 (9 samples and 1 test).
+
+The information that follows shows the logic in selecting the Random Forest "best model".  I also for the Random Forest model show the relative importance of the predictors.  
+
+```{r models_accuracy, message=FALSE, cache=TRUE}
+# Summarize accuracy of models
+results <- resamples(list(lda=fit.lda, cart=fit.cart, knn=fit.knn, svm=fit.svm, rf=fit.rf))
+summary(results)
+```
+
+```{r plot_accuracy, messages=FALSE, cache=TRUE}
+# Compare accuracy of models
+dotplot(results)
+```
+
+```{r best_model, messages=FALSE, cache=TRUE}
+# Summarize Best Model
+fit.rf$finalModel
+predictions <- predict(fit.rf, training)
+tcm <- confusionMatrix(predictions, training$classe)
+tcm
+#importance(fit.rf$finalModel) # Table very large
+varImpPlot(fit.rf$finalModel)
+```
+
+```{r validation, messages=FALSE, cache=TRUE}
+# estimate skill of rf on the validation dataset
+predictions <- predict(fit.rf, testing)
+vcm <- confusionMatrix(predictions, testing$classe)
+vcm
+```
+
+### 3. Sample Error ###
+What you think the expected out of sample error is.  
+
+```{r out_of_sample, messages=FALSE, cache=TRUE}
+# Out-of-sample error
+ose <- round((1 - vcm$overall[1])*100, digits = 2)
+```
+
+The out of sample error is `r ose` percent.
+
+In Sample Error: "The error rate you get on the same data set you used to build your predictor.  Sometimes called resubstitution error."
+
+Out of Sample Error: "The error rate you get on a new data set.  Sometimes called generalization error."
+
+Focus is out of sample error.  In sample error < out of sample error (due to overfitting - matching your algorithm to the data you have). Data have two parts: i) Signal and ii) Noise. Goal of a predictor is to find signal. If "perfect" in-sample predictor then capture signal + noise for that data.  Predictor will not performa as well on new samples.
+
+### 3. Prediction ###
+Use a prediction model to predict 20 different test cases. 
+
+```{r quiz_predict, messages=FALSE, cache=TRUE}
+# Create quiz prediction set
+as.data.frame(predict(fit.rf, quiz))
+```
+
+## Conclusion  ##
+By loading the data correctly, choosing a sensible group of possible predictors, creating a training and test set, leveraging caret with k-fold cross validation and comparing several possible modeling frameworks, I used the prediction model with the best accuracy, Random Forest - 99.7%, and I was able to correctly predict the outcome for 20 out of 20 test cases - 100%.
+
+## 4. Appendix ##
+
+### 4.1 Assignment ###
+Submit a report describing:  
+1. How you built your model.  
+1. How you used cross validation.  
+1. What you think the expected out of sample error is.  
+1. Why you made the choices you did.  
+1. Use prediction model to predict 20 different test cases. 
+
+Github repo with R markdown and compiled HTML file describing your analysis  
+writeup < 2000 words  
+figures < 5  
+Easier if submit a repo with a gh-pages branch so the HTML page can be viewed online  
+
+References:  
+https://www.coursera.org/learn/practical-machine-learning/peer/R43St/prediction-assignment-writeup  
+https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-ghPagesSetup.md  
+
+### 4.2 Model Building Steps ###
+1. Question  
+1. Input Data  
+1. Features  
+1. Algorithm  
+1. Parameters  
+1. Evaluation  
+
+### 4.3 Background ###
+Devices capture personal activity data (human activity recognition), typically how much they do something but not how well. 6 participants (male 20-28) were asked to perform barbell lifts correct and incorrect, 5 different ways (of 10 repetitions). Accelerometers on the belt, forearm, arm and dumbell took measurements.  
+
+Class:  
+A - exact specification  
+B - throw elbows to the front  
+C - lifting the dumbbell only halfway  
+D - lowering the dumbbell only halfway  
+E - throwing the hips to the front 
+
+Source: http://groupware.les.inf.puc-rio.br/har  
